@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>원우의 영화 보관소</title>
+    <style>
+        /* 1. 기본 테마 설정 (다크 모드 감성) */
+        :root {
+            --primary-color: #ff4081; /* 포인트 컬러 */
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --border-color: #333;
+        }
+
+        body { 
+            font-family: 'Pretendard', 'Arial', sans-serif; 
+            display: flex; 
+            margin: 0; 
+            background: var(--bg-color); 
+            color: var(--text-color);
+        }
+
+        /* 2. 사이드바 스타일 (고정형) */
+        #sidebar { 
+            width: 220px; 
+            background: #000; 
+            height: 100vh; 
+            padding: 30px 20px; 
+            position: fixed; 
+            border-right: 1px solid var(--border-color);
+        }
+
+        #sidebar h2 { color: var(--primary-color); text-align: center; margin-bottom: 30px; }
+
+        /* 3. 콘텐츠 영역 (영화 목록 그리드) */
+        #content { margin-left: 260px; padding: 40px; flex: 1; }
+
+        /* 4. 버튼 스타일 (애니메이션 효과) */
+        button { 
+            display: block; 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 12px; 
+            cursor: pointer; 
+            border: 1px solid var(--border-color); 
+            background: transparent; 
+            color: #bbb; 
+            border-radius: 8px; 
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        button:hover { 
+            background: var(--primary-color); 
+            color: white; 
+            border-color: var(--primary-color);
+            box-shadow: 0 0 15px rgba(255, 64, 129, 0.4);
+        }
+
+        /* 5. 영화 카드 스타일 (그리드 배치) */
+        #movie-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .movie-card { 
+            background: var(--card-bg); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border: 1px solid #222;
+        }
+
+        .movie-card h3 { color: var(--primary-color); margin-top: 0; }
+
+        /* 6. 댓글 및 입력창 스타일 (기존 기능 유지) */
+        .comment-box { 
+            margin-top: 20px; 
+            padding-top: 15px; 
+            border-top: 1px solid #333; 
+        }
+    
+        .comment-inputs { display: flex; gap: 8px; margin-bottom: 15px; }
+    
+        input, select, textarea {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .btn-comment { 
+            background: var(--primary-color); 
+            color: white;
+            width: 80px; 
+            margin: 0; 
+            font-size: 14px; 
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>장르 선택</h2>
+        <button onclick="fetchMovies('Animation')">애니메이션</button>
+        <button onclick="fetchMovies('Action')">액션</button>
+        <button onclick="fetchMovies('Romance')">로맨스</button>
+        <button onclick="fetchMovies('Sci-Fi')">SF</button>
+        <button onclick="fetchMovies('Thriller')">스릴러</button>
+        <button onclick="fetchMovies('Fantasy')">판타지</button>
+    </div>
+    <div id="content">
+        <h1>🎬 영화 목록</h1>
+        <div id="movie-list">좌측 버튼을 눌러 영화를 불러오세요!</div>
+    </div>
+
+    <div class="movie-card" style="border: 2px solid #ff4081;">
+        <h2>🎬 새 영화 등록</h2>
+        <div style="display: grid; gap: 10px;">
+            <input type="text" id="new-title" placeholder="영화 제목">
+            <select id="new-genre">
+                <option value="Animation">애니메이션</option>
+                <option value="Action">액션</option>
+                <option value="Romance">로맨스</option>
+                <option value="Sci-Fi">SF</option>
+                <option value="Thriller">스릴러</option>
+                <option value="Fantasy">판타지</option>
+            </select>
+            <input type="text" id="new-director" placeholder="감독 이름">
+            <input type="number" id="new-rating" step="0.1" placeholder="초기 별점 (0~10)">
+            <textarea id="new-summary" placeholder="한줄평을 작성하세요..." style="padding: 10px;"></textarea>
+            <button style="background: #ff4081; color: white;" onclick="registerMovie()">영화 등록하기</button>
+        </div>
+    </div>
+
+    <script>
+        function fetchMovies(genre) {
+            const listDiv = document.getElementById('movie-list');
+            listDiv.innerHTML = '로딩 중...';
+
+  	    fetch(`/api/movies?genre=${genre}`)
+                .then(response => response.json())
+                .then(data => {
+                    listDiv.innerHTML = '';
+                    if(data.length === 0) { listDiv.innerHTML = '데이터가 없습니다.'; return; }
+            
+                    data.forEach(movie => {
+                        // 각 영화의 댓글을 가져오는 추가 마법!
+                        fetch(`/api/comments?movieId=${movie.id}`)
+                            .then(res => res.json())
+                   	    .then(comments => {
+                                // 평균 평점 계산 로직: Average = (sum of ratings) / count
+                                let avgRating = 0;
+                                if (comments.length > 0) {
+                                    const sum = comments.reduce((acc, c) => acc + c.rating, 0);
+                                    avgRating = (sum / comments.length).toFixed(1);
+                                } else {
+                                    avgRating = movie.rating; // 댓글 없으면 기본 평점 표시
+                                }
+
+                                const card = `
+                                    <div class="movie-card">
+                                        <h3>${movie.title} (⭐평균: ${avgRating})</h3>
+                                        <p><b>장르:</b> ${movie.genre} | <b>감독:</b> ${movie.director}</p>
+                                        <p>${movie.summary}</p>
+                                
+                                        <div id="comments-list-${movie.id}" style="background: #f9f9f9; padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 0.9em;">
+                                            <strong>💬 댓글 (${comments.length}개)</strong>
+                                            ${comments.map(c => `<div><b>${c.userName}:</b> ${c.content} (⭐${c.rating})</div>`).join('')}
+                                        </div>
+
+                                        <div class="comment-box">
+                                            <div class="comment-inputs">
+                                                <input type="text" id="user-${movie.id}" placeholder="닉네임" style="width: 80px;">
+                                        	<input type="text" id="content-${movie.id}" placeholder="댓글을 남겨보세요!" style="flex: 1;">
+                                        	<input type="number" id="rating-${movie.id}" step="0.1" min="0" max="10" placeholder="평점" style="width: 60px;">
+                                        	<button class="btn-comment" onclick="submitComment(${movie.id})">등록</button>
+                                    	    </div>
+                                	</div>
+                            	    </div>`;
+                                listDiv.innerHTML += card;
+                            });
+                    });
+                });
+        }
+            
+
+
+        function submitComment(movieId) {
+            const userName = document.getElementById(`user-${movieId}`).value;
+            const content = document.getElementById(`content-${movieId}`).value;
+            const rating = document.getElementById(`rating-${movieId}`).value;
+
+            if (!userName || !content) {
+                alert("닉네임과 내용을 모두 입력해줘!");
+                return;
+            }
+
+            fetch('/api/comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    movieId: movieId,
+                    userName: userName,
+                    content: content,
+                    rating: parseFloat(rating) || 0
+                })
+            })
+            .then(response => response.text())
+            .then(msg => {
+                alert(msg);
+                // 입력 필드 초기화
+                document.getElementById(`user-${movieId}`).value = '';
+                document.getElementById(`content-${movieId}`).value = '';
+                document.getElementById(`rating-${movieId}`).value = '';
+            })
+            .catch(err => alert('전송 중 오류 발생: ' + err));
+        }
+
+        function registerMovie() {
+        const movieData = {
+            title: document.getElementById('new-title').value,
+            genre: document.getElementById('new-genre').value,
+            director: document.getElementById('new-director').value,
+            rating: parseFloat(document.getElementById('new-rating').value) || 0,
+            summary: document.getElementById('new-summary').value
+        };
+
+        if (!movieData.title || !movieData.director) {
+            alert("제목과 감독은 필수!");
+            return;
+        }
+
+        fetch('/api/movies', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(movieData)
+        })
+        .then(response => response.text())
+        .then(msg => {
+            alert(msg);
+            location.reload(); // 등록 후 목록 갱신!
+        })
+        .catch(err => alert('등록 실패: ' + err));
+    }
+    </script>
+</body>
+</html>
